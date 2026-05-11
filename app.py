@@ -18,7 +18,7 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .hero { text-align: center; padding: 2rem 0 1rem; }
-    .hero h1 { font-size: 2.8rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.3rem; }
+    .hero h1 { font-size: 2.8rem; font-weight: 700; color: #1a1a2e; }
     .hero p { font-size: 1.1rem; color: #666; margin-bottom: 2rem; }
     .badge { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; }
     .stButton > button { background: #2980b9; color: white; border: none; border-radius: 10px; padding: 0.7rem 2rem; font-size: 1rem; font-weight: 600; width: 100%; }
@@ -37,16 +37,8 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "perfil" not in st.session_state:
     st.session_state.perfil = {}
-
-params = st.query_params
-if "access_token" in params and st.session_state.user is None:
-    try:
-        user = supabase.auth.get_user(params["access_token"])
-        st.session_state.user = user.user
-        st.query_params.clear()
-        st.rerun()
-    except Exception as e:
-        st.error(f"Erro no login: {e}")
+if "email_enviado" not in st.session_state:
+    st.session_state.email_enviado = False
 
 if st.session_state.user is None:
     st.markdown("""
@@ -59,30 +51,60 @@ if st.session_state.user is None:
 
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.markdown("### Entre para começar")
-        if st.button("🔑 Entrar com Google"):
-            try:
-                redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
-                data = supabase.auth.sign_in_with_oauth({
-                    "provider": "google",
-                    "options": {
-                        "redirect_to": redirect_url,
-                        "skip_http_redirect": True
-                    }
-                })
-                st.link_button("✅ Clique aqui para fazer login com Google", url=data.url)
-            except Exception as e:
-                st.error(f"Erro: {e}")
+        if not st.session_state.email_enviado:
+            st.markdown("### Acesse sua conta")
+            email = st.text_input("Seu email", placeholder="seu@email.com")
+            if st.button("✉️ Enviar link de acesso"):
+                if email:
+                    try:
+                        supabase.auth.sign_in_with_otp({
+                            "email": email,
+                            "options": {
+                                "email_redirect_to": "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
+                            }
+                        })
+                        st.session_state.email_enviado = True
+                        st.session_state.email_usuario = email
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+                else:
+                    st.warning("Digite seu email.")
+        else:
+            st.markdown("### ✉️ Verifique seu email")
+            st.success(f"Enviamos um link para **{st.session_state.get('email_usuario', '')}**")
+            st.info("Clique no link do email para entrar. Depois cole o token abaixo.")
+
+            token = st.text_input("Cole o token do email aqui (6 dígitos)", placeholder="123456")
+            email_confirm = st.session_state.get("email_usuario", "")
+
+            if st.button("✅ Confirmar acesso"):
+                if token:
+                    try:
+                        session = supabase.auth.verify_otp({
+                            "email": email_confirm,
+                            "token": token,
+                            "type": "email"
+                        })
+                        st.session_state.user = session.user
+                        st.session_state.email_enviado = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Token inválido ou expirado: {e}")
+
+            if st.button("← Voltar"):
+                st.session_state.email_enviado = False
+                st.rerun()
 
 else:
     user = st.session_state.user
-    nome_user = user.user_metadata.get("full_name", "Estudante")
+    nome_user = user.user_metadata.get("full_name", user.email.split("@")[0])
     email_user = user.email
 
     with st.sidebar:
         st.markdown(f"**{nome_user}**")
         st.caption(email_user)
-        if st.button("🚪 Sair"):
+        if st.button("�� Sair"):
             supabase.auth.sign_out()
             st.session_state.user = None
             st.session_state.plano_gerado = None
@@ -91,7 +113,7 @@ else:
     st.markdown("""
     <div class="hero">
         <span class="badge">🤖 Powered by IA</span>
-        <h1>�� Point.AI</h1>
+        <h1>🎯 Point.AI</h1>
         <p>Planos de estudo personalizados para universitários.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -137,7 +159,7 @@ else:
             if not materias or not objetivo:
                 st.warning("Preencha pelo menos matérias e objetivo.")
             else:
-                with st.spinner("🧠 Analisando seu perfil..."):
+                with st.spinner("�� Analisando seu perfil..."):
                     try:
                         cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
                         content = []
