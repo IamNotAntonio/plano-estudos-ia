@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(
-    page_title="StudyAI — Seu Plano de Estudos Personalizado",
+    page_title="Point.AI — Seu Plano de Estudos Personalizado",
     page_icon="🎓",
     layout="centered"
 )
@@ -43,7 +43,7 @@ if "checklist" not in st.session_state:
 st.markdown("""
 <div class="hero">
     <span class="badge">🤖 Powered by IA</span>
-    <h1>🎓 StudyAI</h1>
+    <h1>🎓 Point.AI</h1>
     <p>Planos de estudo personalizados para universitários.<br>Gerado por IA em segundos.</p>
 </div>
 """, unsafe_allow_html=True)
@@ -342,5 +342,5 @@ Seja didático, use emojis e exemplos do cotidiano de um universitário de {perf
                 except Exception as e:
                     st.error(f"Erro: {e}")
 st.markdown("""
-<footer>StudyAI © 2025 — Feito para universitários que levam os estudos a sério.</footer>
+<footer>Point.AI © 2025 — Feito para universitários que levam os estudos a sério.</footer>
 """, unsafe_allow_html=True)
