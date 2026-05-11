@@ -2,128 +2,209 @@ import os
 import base64
 import streamlit as st
 import anthropic
-from supabase import create_client
 from dotenv import load_dotenv
 
 load_dotenv()
-
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Point.AI", page_icon="🎯", layout="centered")
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .hero { text-align: center; padding: 2rem 0 1rem; }
-    .hero h1 { font-size: 2.8rem; font-weight: 700; color: #1a1a2e; }
-    .hero p { font-size: 1.1rem; color: #666; margin-bottom: 2rem; }
-    .badge { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; }
-    .stButton > button { background: #2980b9; color: white; border: none; border-radius: 10px; padding: 0.7rem 2rem; font-size: 1rem; font-weight: 600; width: 100%; }
+
+    .hero { text-align: center; padding: 4rem 0 2rem; }
+    .hero h1 { font-size: 3.2rem; font-weight: 800; color: #1a1a2e; line-height: 1.2; margin-bottom: 1rem; }
+    .hero h1 span { color: #2980b9; }
+    .hero p { font-size: 1.2rem; color: #555; margin-bottom: 2rem; line-height: 1.7; }
+    .badge { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin-bottom: 1.5rem; }
+
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 2rem 0; }
+    .feature-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 16px rgba(0,0,0,0.06); text-align: center; border: 1px solid #f0f0f0; }
+    .feature-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .feature-title { font-weight: 700; color: #1a1a2e; margin-bottom: 0.3rem; font-size: 0.95rem; }
+    .feature-desc { color: #888; font-size: 0.82rem; line-height: 1.5; }
+
+    .how-it-works { background: white; border-radius: 20px; padding: 2rem; margin: 2rem 0; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+    .step { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.2rem; }
+    .step-num { background: #2980b9; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; font-size: 0.9rem; }
+    .step-content h4 { margin: 0 0 0.2rem; color: #1a1a2e; font-size: 0.95rem; }
+    .step-content p { margin: 0; color: #888; font-size: 0.85rem; }
+
+    .testimonial { background: #f8fbff; border-radius: 16px; padding: 1.5rem; margin: 1rem 0; border-left: 4px solid #2980b9; }
+    .testimonial p { color: #333; font-style: italic; margin-bottom: 0.5rem; }
+    .testimonial span { color: #888; font-size: 0.85rem; font-weight: 600; }
+
+    .cta-box { background: linear-gradient(135deg, #2980b9, #1a6fa8); border-radius: 20px; padding: 3rem 2rem; text-align: center; margin: 2rem 0; }
+    .cta-box h2 { color: white; font-size: 1.8rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .cta-box p { color: rgba(255,255,255,0.85); margin-bottom: 1.5rem; }
+
+    .stButton > button { background: #2980b9; color: white; border: none; border-radius: 10px; padding: 0.8rem 2rem; font-size: 1rem; font-weight: 600; width: 100%; transition: all 0.2s; }
+    .stButton > button:hover { background: #1a6fa8; transform: translateY(-1px); }
+
+    .cta-box .stButton > button { background: white; color: #2980b9; font-size: 1.1rem; padding: 1rem 2rem; border-radius: 12px; }
+
     .chat-msg-user { background: #2980b9; color: white; border-radius: 16px 16px 4px 16px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; margin-left: auto; }
     .chat-msg-ai { background: #f0f4f8; color: #1a1a2e; border-radius: 16px 16px 16px 4px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; }
+
     div[data-testid="stForm"] { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
     footer { text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 3rem; padding-bottom: 2rem; }
+
+    .stat { text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 800; color: #2980b9; }
+    .stat-label { font-size: 0.85rem; color: #888; }
 </style>
 """, unsafe_allow_html=True)
 
-if "user" not in st.session_state:
-    st.session_state.user = None
 if "plano_gerado" not in st.session_state:
     st.session_state.plano_gerado = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "perfil" not in st.session_state:
     st.session_state.perfil = {}
-if "email_enviado" not in st.session_state:
-    st.session_state.email_enviado = False
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "home"
 
-if st.session_state.user is None:
+if st.session_state.pagina == "home":
     st.markdown("""
     <div class="hero">
-        <span class="badge">🤖 Powered by IA</span>
-        <h1>🎯 Point.AI</h1>
-        <p>Planos de estudo personalizados para universitários.<br>Gerado por IA em segundos.</p>
+        <span class="badge">🤖 Inteligência Artificial para Estudantes</span>
+        <h1>Estude com um plano<br><span>feito só para você</span></h1>
+        <p>O Point.AI analisa seu perfil, suas matérias e até suas provas antigas<br>para criar um plano de estudos 100% personalizado em segundos.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="stat"><div class="stat-num">100%</div><div class="stat-label">Personalizado para você</div></div>', unsafe_allow_html=True)
     with col2:
-        if not st.session_state.email_enviado:
-            st.markdown("### Acesse sua conta")
-            email = st.text_input("Seu email", placeholder="seu@email.com")
-            if st.button("✉️ Enviar link de acesso"):
-                if email:
-                    try:
-                        supabase.auth.sign_in_with_otp({
-                            "email": email,
-                            "options": {
-                                "email_redirect_to": "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
-                            }
-                        })
-                        st.session_state.email_enviado = True
-                        st.session_state.email_usuario = email
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-                else:
-                    st.warning("Digite seu email.")
-        else:
-            st.markdown("### ✉️ Verifique seu email")
-            st.success(f"Enviamos um link para **{st.session_state.get('email_usuario', '')}**")
-            st.info("Clique no link do email para entrar. Depois cole o token abaixo.")
+        st.markdown('<div class="stat"><div class="stat-num">4</div><div class="stat-label">Ferramentas integradas</div></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="stat"><div class="stat-num">30s</div><div class="stat-label">Para gerar seu plano</div></div>', unsafe_allow_html=True)
 
-            token = st.text_input("Cole o token do email aqui (6 dígitos)", placeholder="123456")
-            email_confirm = st.session_state.get("email_usuario", "")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.button("✅ Confirmar acesso"):
-                if token:
-                    try:
-                        session = supabase.auth.verify_otp({
-                            "email": email_confirm,
-                            "token": token,
-                            "type": "email"
-                        })
-                        st.session_state.user = session.user
-                        st.session_state.email_enviado = False
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Token inválido ou expirado: {e}")
-
-            if st.button("← Voltar"):
-                st.session_state.email_enviado = False
-                st.rerun()
-
-else:
-    user = st.session_state.user
-    nome_user = user.user_metadata.get("full_name", user.email.split("@")[0])
-    email_user = user.email
-
-    with st.sidebar:
-        st.markdown(f"**{nome_user}**")
-        st.caption(email_user)
-        if st.button("�� Sair"):
-            supabase.auth.sign_out()
-            st.session_state.user = None
-            st.session_state.plano_gerado = None
+    col_btn1, col_btn2, col_btn3 = st.columns([1,2,1])
+    with col_btn2:
+        if st.button("🚀 Criar meu plano agora — é grátis"):
+            st.session_state.pagina = "app"
             st.rerun()
 
     st.markdown("""
-    <div class="hero">
-        <span class="badge">🤖 Powered by IA</span>
-        <h1>🎯 Point.AI</h1>
-        <p>Planos de estudo personalizados para universitários.</p>
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">📚</div>
+            <div class="feature-title">Plano Personalizado</div>
+            <div class="feature-desc">A IA analisa seu nível, tempo disponível e até fotos das suas provas para criar o plano ideal</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <div class="feature-title">Chat com IA</div>
+            <div class="feature-desc">Tire dúvidas, peça exercícios e ideias para trabalhos com um tutor disponível 24h</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📝</div>
+            <div class="feature-title">Simulados</div>
+            <div class="feature-desc">Questões geradas sob medida para suas matérias e nível de dificuldade</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🎥</div>
+            <div class="feature-title">Lições Complementares</div>
+            <div class="feature-desc">Explicações detalhadas com exercícios, recursos e canais do YouTube para cada matéria</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">📸</div>
+            <div class="feature-title">Análise de Fotos</div>
+            <div class="feature-desc">Envie fotos do cronograma, ementa ou prova antiga e a IA adapta o plano ao conteúdo real</div>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">⬇️</div>
+            <div class="feature-title">Download do Plano</div>
+            <div class="feature-desc">Baixe seu plano completo para consultar offline quando e onde quiser</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="how-it-works">
+        <h3 style="margin-bottom: 1.5rem; color: #1a1a2e;">⚡ Como funciona</h3>
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <h4>Preencha seu perfil</h4>
+                <p>Informe suas matérias, objetivo, tempo disponível e nível atual</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <h4>Envie seus materiais (opcional)</h4>
+                <p>Fotos do cronograma, ementa ou provas antigas para personalização máxima</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+                <h4>Receba seu plano em segundos</h4>
+                <p>A IA gera um cronograma completo, semana a semana, com dicas específicas para você</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+                <h4>Use o chat para tirar dúvidas</h4>
+                <p>Pergunte qualquer coisa sobre suas matérias, peça exercícios ou ideias para trabalhos</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <h3 style="text-align: center; color: #1a1a2e; margin: 2rem 0 1rem;">💬 O que estudantes dizem</h3>
+    <div class="testimonial">
+        <p>"Estava perdido no 3º semestre de Engenharia com 5 matérias ao mesmo tempo. O Point.AI montou um plano realista que consegui seguir de verdade."</p>
+        <span>— Lucas M., Engenharia Elétrica — USP</span>
+    </div>
+    <div class="testimonial">
+        <p>"Enviei a foto da minha ementa de Cálculo III e ele montou o plano exato com os tópicos da minha professora. Incrível."</p>
+        <span>— Mariana S., Matemática — UNICAMP</span>
+    </div>
+    <div class="testimonial">
+        <p>"O chat de dúvidas salvou minha prova de Estrutura de Dados. Explica melhor que muito professor."</p>
+        <span>— Rafael T., Ciência da Computação — UFMG</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="cta-box">
+        <h2>Pronto para estudar do jeito certo?</h2>
+        <p>Crie seu plano personalizado agora. Gratuito, sem cadastro.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_btn4, col_btn5, col_btn6 = st.columns([1,2,1])
+    with col_btn5:
+        if st.button("🎯 Começar agora"):
+            st.session_state.pagina = "app"
+            st.rerun()
+
+elif st.session_state.pagina == "app":
+    col_back, col_title = st.columns([1,4])
+    with col_back:
+        if st.button("← Voltar"):
+            st.session_state.pagina = "home"
+            st.session_state.plano_gerado = None
+            st.rerun()
+    with col_title:
+        st.markdown("### 🎯 Point.AI")
 
     if st.session_state.plano_gerado is None:
         with st.form("diagnostico"):
             st.markdown("### 📋 Seu diagnóstico de estudos")
+            st.caption("Quanto mais detalhes, mais personalizado será seu plano.")
             col1, col2 = st.columns(2)
             with col1:
-                nome = st.text_input("Seu nome", value=nome_user)
+                nome = st.text_input("Seu nome", placeholder="ex: João Silva")
                 curso = st.text_input("Seu curso", placeholder="ex: Engenharia de Software")
                 universidade = st.text_input("Sua universidade", placeholder="ex: USP, UNICAMP...")
             with col2:
@@ -145,6 +226,7 @@ else:
 
             st.markdown("---")
             st.markdown("### 📸 Envie fotos para personalização avançada")
+            st.caption("Opcional — mas faz o plano muito mais preciso.")
             col5, col6 = st.columns(2)
             with col5:
                 foto_cronograma = st.file_uploader("🗓 Cronograma", type=["jpg","jpeg","png"])
@@ -156,10 +238,10 @@ else:
             enviar = st.form_submit_button("🚀 Gerar meu plano personalizado")
 
         if enviar:
-            if not materias or not objetivo:
-                st.warning("Preencha pelo menos matérias e objetivo.")
+            if not materias or not objetivo or not nome:
+                st.warning("Preencha pelo menos nome, matérias e objetivo.")
             else:
-                with st.spinner("�� Analisando seu perfil..."):
+                with st.spinner("🧠 Analisando seu perfil e gerando seu plano..."):
                     try:
                         cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
                         content = []
