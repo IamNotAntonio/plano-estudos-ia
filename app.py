@@ -255,7 +255,7 @@ Seja didático, use exemplos práticos e emojis para organizar."""
                 try:
                     cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-                    prompt_sim = f"""Crie um simulado com {num_questoes} questões de múltipla escolha sobre {materia_sim} 
+                    prompt_sim = f"""Crie um simulado com {num_questoes} questões de múltipla escolha sobre {materia_simulado} 
 para um estudante de {perfil.get('curso')} de nível {dificuldade_sim}.
 Formato para cada questão:
 **Questão N:** enunciado
