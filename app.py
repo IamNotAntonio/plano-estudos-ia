@@ -2,13 +2,18 @@ import os
 import base64
 import streamlit as st
 import anthropic
+from supabase import create_client
 from dotenv import load_dotenv
 
 load_dotenv()
 
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 st.set_page_config(
-    page_title="Point.AI — Seu Plano de Estudos Personalizado",
-    page_icon="🎓",
+    page_title="Point.AI — Seu Plano de Estudos",
+    page_icon="🎯",
     layout="centered"
 )
 
@@ -24,323 +29,239 @@ st.markdown("""
     .stButton > button:hover { background: #1a6fa8; }
     .chat-msg-user { background: #2980b9; color: white; border-radius: 16px 16px 4px 16px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; margin-left: auto; }
     .chat-msg-ai { background: #f0f4f8; color: #1a1a2e; border-radius: 16px 16px 16px 4px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; }
-    .progress-bar { background: #e0e0e0; border-radius: 10px; height: 8px; margin: 4px 0; }
-    .progress-fill { background: #2980b9; border-radius: 10px; height: 8px; }
+    .login-box { background: white; border-radius: 16px; padding: 3rem 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center; max-width: 400px; margin: 2rem auto; }
     div[data-testid="stForm"] { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
     footer { text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 3rem; padding-bottom: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
+if "user" not in st.session_state:
+    st.session_state.user = None
 if "plano_gerado" not in st.session_state:
     st.session_state.plano_gerado = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "perfil" not in st.session_state:
     st.session_state.perfil = {}
-if "checklist" not in st.session_state:
-    st.session_state.checklist = {}
 
-st.markdown("""
-<div class="hero">
-    <span class="badge">🤖 Powered by IA</span>
-    <h1>🎓 Point.AI</h1>
-    <p>Planos de estudo personalizados para universitários.<br>Gerado por IA em segundos.</p>
-</div>
-""", unsafe_allow_html=True)
+params = st.query_params
+if "code" in params and st.session_state.user is None:
+    try:
+        session = supabase.auth.exchange_code_for_session({"auth_code": params["code"]})
+        st.session_state.user = session.user
+        st.query_params.clear()
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro no login: {e}")
 
-if st.session_state.plano_gerado is None:
-    with st.form("diagnostico"):
-        st.markdown("### 📋 Seu diagnóstico de estudos")
-        st.caption("Quanto mais detalhes, mais personalizado será seu plano.")
+if st.session_state.user is None:
+    st.markdown("""
+    <div class="hero">
+        <span class="badge">🤖 Powered by IA</span>
+        <h1>🎯 Point.AI</h1>
+        <p>Planos de estudo personalizados para universitários.<br>Gerado por IA em segundos.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            nome = st.text_input("Seu nome", placeholder="ex: João Silva")
-            curso = st.text_input("Seu curso", placeholder="ex: Engenharia de Software")
-            universidade = st.text_input("Sua universidade", placeholder="ex: USP, UNICAMP, UFMG...")
-        with col2:
-            semestre = st.selectbox("Semestre atual", [f"{i}º semestre" for i in range(1, 11)])
-            objetivo = st.text_input("Objetivo principal", placeholder="ex: passar em Cálculo II")
-            provas = st.text_input("Provas marcadas?", placeholder="ex: Cálculo dia 20/06")
+    st.markdown('<div class="login-box">', unsafe_allow_html=True)
+    st.markdown("### Entre para começar")
+    st.markdown("Acesse com sua conta Google e receba seu plano personalizado.")
 
-        materias = st.text_area("Quais matérias precisa estudar?", placeholder="ex: Cálculo II, Física III, POO", height=80)
+    if st.button("🔑 Entrar com Google"):
+        try:
+            redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app"
+            data = supabase.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {"redirect_to": redirect_url}
+            })
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={data.url}">', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Erro: {e}")
 
-        col3, col4 = st.columns(2)
-        with col3:
-            horas = st.slider("Horas disponíveis por dia", 1, 12, 3)
-            semanas = st.slider("Semanas até a prova", 1, 16, 4)
-        with col4:
-            estilo = st.selectbox("Como você aprende melhor?", ["Lendo e resumindo", "Resolvendo exercícios", "Assistindo videoaulas", "Mistura de tudo"])
-            nivel = st.selectbox("Nível geral nas matérias", ["Iniciante — muita dificuldade", "Básico — entendo pouco", "Intermediário — entendo razoável", "Avançado — só revisar"])
-
-        dificuldade = st.text_area("Qual sua maior dificuldade?", placeholder="ex: Não consigo manter foco, não entendo derivadas...", height=80)
-
-        st.markdown("---")
-        st.markdown("### 📸 Envie fotos para personalização avançada")
-        st.caption("A IA analisa seus materiais reais e detecta automaticamente suas dificuldades.")
-
-        col5, col6 = st.columns(2)
-        with col5:
-            foto_cronograma = st.file_uploader("🗓 Cronograma da faculdade", type=["jpg","jpeg","png"])
-            foto_anotacoes = st.file_uploader("📝 Suas anotações", type=["jpg","jpeg","png"])
-        with col6:
-            foto_prova = st.file_uploader("📄 Prova anterior", type=["jpg","jpeg","png"])
-            foto_ementa = st.file_uploader("📋 Ementa da disciplina", type=["jpg","jpeg","png"])
-
-        enviar = st.form_submit_button("🚀 Gerar meu plano personalizado")
-
-    if enviar:
-        if not materias or not objetivo or not nome:
-            st.warning("Preencha pelo menos nome, matérias e objetivo.")
-        else:
-            with st.spinner("🧠 Analisando seu perfil e materiais..."):
-                try:
-                    cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-                    content = []
-                    imagens_analisadas = []
-
-                    uploads = {
-                        "Cronograma da faculdade": foto_cronograma,
-                        "Anotações do aluno": foto_anotacoes,
-                        "Prova anterior": foto_prova,
-                        "Ementa da disciplina": foto_ementa
-                    }
-
-                    for descricao, foto in uploads.items():
-                        if foto is not None:
-                            dados = base64.standard_b64encode(foto.read()).decode("utf-8")
-                            content.append({"type": "image", "source": {"type": "base64", "media_type": foto.type, "data": dados}})
-                            content.append({"type": "text", "text": f"Imagem: {descricao}. Analise e extraia informações relevantes."})
-                            imagens_analisadas.append(descricao)
-
-                    fotos_txt = f"Imagens enviadas: {', '.join(imagens_analisadas)}" if imagens_analisadas else "Sem imagens."
-
-                    prompt = f"""Você é um especialista em pedagogia universitária.
-
-PERFIL:
-- Nome: {nome} | Curso: {curso} | Universidade: {universidade if universidade else 'Não informada'}
-- Semestre: {semestre} | Objetivo: {objetivo}
-- Matérias: {materias}
-- Horas/dia: {horas}h | Prazo: {semanas} semanas
-- Estilo: {estilo} | Nível: {nivel}
-- Dificuldade: {dificuldade}
-- Provas: {provas if provas else 'Não informado'}
-- {fotos_txt}
-
-INSTRUÇÕES:
-1. Se houver imagens, analise e mencione o que encontrou
-2. Detecte automaticamente o nível de dificuldade de cada matéria
-3. Análise personalizada do perfil de {nome}
-4. Cronograma SEMANA A SEMANA detalhado
-5. Para cada semana liste os tópicos diários como checklist no formato:
-   - [ ] Tópico 1
-   - [ ] Tópico 2
-6. Técnicas específicas para o estilo de aprendizado
-7. Marcos de progresso mensuráveis
-8. Sugestões de recursos (livros, sites, canais YouTube) para cada matéria
-9. Mensagem motivacional personalizada para {nome}
-
-Use emojis. Seja específico e detalhado."""
-
-                    content.append({"type": "text", "text": prompt})
-
-                    mensagem = cliente.messages.create(
-                        model="claude-sonnet-4-5",
-                        max_tokens=4000,
-                        messages=[{"role": "user", "content": content}]
-                    )
-
-                    st.session_state.plano_gerado = mensagem.content[0].text
-                    st.session_state.perfil = {
-                        "nome": nome, "curso": curso, "universidade": universidade,
-                        "materias": materias, "objetivo": objetivo, "horas": horas,
-                        "semanas": semanas, "nivel": nivel, "estilo": estilo,
-                        "imagens": imagens_analisadas
-                    }
-                    st.session_state.chat_history = []
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
-    perfil = st.session_state.perfil
-    nome = perfil.get("nome", "")
+    user = st.session_state.user
+    nome_user = user.user_metadata.get("full_name", "Estudante")
+    email_user = user.email
 
-    st.success(f"✅ Plano gerado para {nome}!")
-
-    col_a, col_b, col_c, col_d = st.columns(4)
-    with col_a:
-        st.metric("⏱ Horas/dia", f"{perfil.get('horas')}h")
-    with col_b:
-        st.metric("📅 Semanas", perfil.get("semanas"))
-    with col_c:
-        st.metric("🎓 Universidade", perfil.get("universidade") or "—")
-    with col_d:
-        st.metric("📸 Fotos", len(perfil.get("imagens", [])))
-
-    tab1, tab2, tab3, tab4 = st.tabs(["📚 Meu Plano", "💬 Chat com IA", "📝 Simulado", "🎥 Videoaulas"])
-
-    with tab1:
-        st.markdown(st.session_state.plano_gerado)
-        st.markdown("---")
-        st.download_button(
-            label="📥 Baixar plano em .txt",
-            data=st.session_state.plano_gerado,
-            file_name=f"plano_{nome.lower().replace(' ','_')}.txt",
-            mime="text/plain"
-        )
-        if st.button("🔄 Gerar novo plano"):
+    with st.sidebar:
+        st.image(user.user_metadata.get("avatar_url", ""), width=60)
+        st.markdown(f"**{nome_user}**")
+        st.caption(email_user)
+        if st.button("🚪 Sair"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
             st.session_state.plano_gerado = None
-            st.session_state.chat_history = []
             st.rerun()
 
-    with tab2:
-        st.markdown(f"### 💬 Tire suas dúvidas, {nome}!")
-        st.caption("Pergunte sobre qualquer matéria, peça exercícios, ideias para trabalhos ou explique um conceito.")
+    st.markdown("""
+    <div class="hero">
+        <span class="badge">🤖 Powered by IA</span>
+        <h1>🎯 Point.AI</h1>
+        <p>Planos de estudo personalizados para universitários.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-        for msg in st.session_state.chat_history:
-            if msg["role"] == "user":
-                st.markdown(f'<div class="chat-msg-user">{msg["content"]}</div>', unsafe_allow_html=True)
+    if st.session_state.plano_gerado is None:
+        with st.form("diagnostico"):
+            st.markdown("### 📋 Seu diagnóstico de estudos")
+            col1, col2 = st.columns(2)
+            with col1:
+                nome = st.text_input("Seu nome", value=nome_user)
+                curso = st.text_input("Seu curso", placeholder="ex: Engenharia de Software")
+                universidade = st.text_input("Sua universidade", placeholder="ex: USP, UNICAMP...")
+            with col2:
+                semestre = st.selectbox("Semestre atual", [f"{i}º semestre" for i in range(1, 11)])
+                objetivo = st.text_input("Objetivo principal", placeholder="ex: passar em Cálculo II")
+                provas = st.text_input("Provas marcadas?", placeholder="ex: Cálculo dia 20/06")
+
+            materias = st.text_area("Quais matérias precisa estudar?", placeholder="ex: Cálculo II, Física III, POO", height=80)
+
+            col3, col4 = st.columns(2)
+            with col3:
+                horas = st.slider("Horas disponíveis por dia", 1, 12, 3)
+                semanas = st.slider("Semanas até a prova", 1, 16, 4)
+            with col4:
+                estilo = st.selectbox("Como você aprende melhor?", ["Lendo e resumindo", "Resolvendo exercícios", "Assistindo videoaulas", "Mistura de tudo"])
+                nivel = st.selectbox("Nível geral nas matérias", ["Iniciante — muita dificuldade", "Básico — entendo pouco", "Intermediário — entendo razoável", "Avançado — só revisar"])
+
+            dificuldade = st.text_area("Qual sua maior dificuldade?", height=80)
+
+            st.markdown("---")
+            st.markdown("### 📸 Envie fotos para personalização avançada")
+            col5, col6 = st.columns(2)
+            with col5:
+                foto_cronograma = st.file_uploader("🗓 Cronograma", type=["jpg","jpeg","png"])
+                foto_anotacoes = st.file_uploader("📝 Anotações", type=["jpg","jpeg","png"])
+            with col6:
+                foto_prova = st.file_uploader("📄 Prova anterior", type=["jpg","jpeg","png"])
+                foto_ementa = st.file_uploader("📋 Ementa", type=["jpg","jpeg","png"])
+
+            enviar = st.form_submit_button("🚀 Gerar meu plano personalizado")
+
+        if enviar:
+            if not materias or not objetivo:
+                st.warning("Preencha pelo menos matérias e objetivo.")
             else:
-                st.markdown(f'<div class="chat-msg-ai">{msg["content"]}</div>', unsafe_allow_html=True)
+                with st.spinner("🧠 Analisando seu perfil..."):
+                    try:
+                        cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                        content = []
+                        imagens_analisadas = []
 
-        with st.form("chat_form", clear_on_submit=True):
-            pergunta = st.text_input("Sua pergunta...", placeholder="ex: Explica derivadas, me dá exercícios de Cálculo, ideias para TCC sobre IA...")
-            enviar_chat = st.form_submit_button("Enviar →")
+                        for descricao, foto in [("Cronograma", foto_cronograma), ("Anotações", foto_anotacoes), ("Prova", foto_prova), ("Ementa", foto_ementa)]:
+                            if foto is not None:
+                                dados = base64.standard_b64encode(foto.read()).decode("utf-8")
+                                content.append({"type": "image", "source": {"type": "base64", "media_type": foto.type, "data": dados}})
+                                content.append({"type": "text", "text": f"Imagem: {descricao}."})
+                                imagens_analisadas.append(descricao)
 
-        if enviar_chat and pergunta:
-            with st.spinner("🧠 Pensando..."):
-                try:
-                    cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                        prompt = f"""Você é um especialista em pedagogia universitária.
+PERFIL: {nome} | {curso} | {universidade} | {semestre} | Objetivo: {objetivo}
+Matérias: {materias} | {horas}h/dia | {semanas} semanas | {estilo} | {nivel}
+Dificuldade: {dificuldade} | Provas: {provas}
+Imagens: {', '.join(imagens_analisadas) if imagens_analisadas else 'nenhuma'}
 
-                    contexto = f"""Você é um tutor universitário especialista ajudando {nome}, 
-estudante de {perfil.get('curso')} na {perfil.get('universidade') or 'faculdade'}.
-Matérias em estudo: {perfil.get('materias')}.
-Objetivo: {perfil.get('objetivo')}.
-Seja didático, use exemplos práticos e emojis para organizar."""
+Crie plano detalhado com: análise do perfil, cronograma semanal com checklists, técnicas personalizadas, marcos de progresso, recursos recomendados e mensagem motivacional. Use emojis."""
 
-                    historico = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history[-10:]]
-                    historico.append({"role": "user", "content": pergunta})
+                        content.append({"type": "text", "text": prompt})
+                        mensagem = cliente.messages.create(model="claude-sonnet-4-5", max_tokens=4000, messages=[{"role": "user", "content": content}])
 
-                    resposta = cliente.messages.create(
-                        model="claude-sonnet-4-5",
-                        max_tokens=1500,
-                        system=contexto,
-                        messages=historico
-                    )
+                        st.session_state.plano_gerado = mensagem.content[0].text
+                        st.session_state.perfil = {"nome": nome, "curso": curso, "universidade": universidade, "materias": materias, "objetivo": objetivo, "horas": horas, "semanas": semanas, "nivel": nivel, "estilo": estilo, "imagens": imagens_analisadas}
+                        st.rerun()
 
-                    resposta_txt = resposta.content[0].text
-                    st.session_state.chat_history.append({"role": "user", "content": pergunta})
-                    st.session_state.chat_history.append({"role": "assistant", "content": resposta_txt})
-                    st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+    else:
+        perfil = st.session_state.perfil
+        nome = perfil.get("nome", "")
 
-    with tab3:
-        st.markdown("### 📝 Simulado Personalizado")
-        st.caption("Gere questões baseadas nas suas matérias para testar seus conhecimentos.")
+        st.success(f"✅ Plano gerado para {nome}!")
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.metric("⏱ Horas/dia", f"{perfil.get('horas')}h")
+        with col_b:
+            st.metric("📅 Semanas", perfil.get("semanas"))
+        with col_c:
+            st.metric("🎓", perfil.get("universidade") or "—")
 
-        col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            materia_simulado = st.selectbox("Matéria", perfil.get("materias","").split(","))
-        with col_s2:
-            num_questoes = st.selectbox("Número de questões", [3, 5, 10])
+        tab1, tab2, tab3, tab4 = st.tabs(["📚 Meu Plano", "💬 Chat com IA", "📝 Simulado", "🎥 Videoaulas"])
 
-        dificuldade_sim = st.select_slider("Dificuldade", ["Fácil", "Médio", "Difícil"])
+        with tab1:
+            st.markdown(st.session_state.plano_gerado)
+            st.download_button("📥 Baixar plano", data=st.session_state.plano_gerado, file_name=f"plano_{nome}.txt", mime="text/plain")
+            if st.button("🔄 Novo plano"):
+                st.session_state.plano_gerado = None
+                st.rerun()
 
-        if st.button("🎯 Gerar simulado"):
-            with st.spinner("Gerando questões..."):
-                try:
-                    cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        with tab2:
+            st.markdown(f"### 💬 Tire suas dúvidas, {nome}!")
+            for msg in st.session_state.chat_history:
+                if msg["role"] == "user":
+                    st.markdown(f'<div class="chat-msg-user">{msg["content"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="chat-msg-ai">{msg["content"]}</div>', unsafe_allow_html=True)
 
-                    prompt_sim = f"""Crie um simulado com {num_questoes} questões de múltipla escolha sobre {materia_simulado} 
-para um estudante de {perfil.get('curso')} de nível {dificuldade_sim}.
-Formato para cada questão:
-**Questão N:** enunciado
-a) opção
-b) opção
-c) opção
-d) opção
-**Resposta:** letra correta — breve explicação
+            with st.form("chat_form", clear_on_submit=True):
+                pergunta = st.text_input("Sua pergunta...", placeholder="ex: Explica derivadas, me dá exercícios...")
+                enviar_chat = st.form_submit_button("Enviar →")
 
-Seja específico e educativo."""
+            if enviar_chat and pergunta:
+                with st.spinner("🧠 Pensando..."):
+                    try:
+                        cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                        contexto = f"Você é tutor de {perfil.get('curso')} na {perfil.get('universidade') or 'faculdade'}. Matérias: {perfil.get('materias')}. Seja didático e use emojis."
+                        historico = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history[-10:]]
+                        historico.append({"role": "user", "content": pergunta})
+                        resposta = cliente.messages.create(model="claude-sonnet-4-5", max_tokens=1500, system=contexto, messages=historico)
+                        st.session_state.chat_history.append({"role": "user", "content": pergunta})
+                        st.session_state.chat_history.append({"role": "assistant", "content": resposta.content[0].text})
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
-                    resposta_sim = cliente.messages.create(
-                        model="claude-sonnet-4-5",
-                        max_tokens=2000,
-                        messages=[{"role": "user", "content": prompt_sim}]
-                    )
-                    st.markdown(resposta_sim.content[0].text)
+        with tab3:
+            st.markdown("### 📝 Simulado Personalizado")
+            col_s1, col_s2 = st.columns(2)
+            with col_s1:
+                materia_simulado = st.selectbox("Matéria", perfil.get("materias","").split(","))
+                num_questoes = st.selectbox("Questões", [3, 5, 10])
+            with col_s2:
+                dificuldade_sim = st.select_slider("Dificuldade", ["Fácil", "Médio", "Difícil"])
 
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-with tab4:
-        st.markdown("### 🎥 Videoaulas e Lições Complementares")
-        st.caption("A IA seleciona e explica conteúdos específicos para suas matérias.")
+            if st.button("🎯 Gerar simulado"):
+                with st.spinner("Gerando questões..."):
+                    try:
+                        cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                        prompt_sim = f"Crie {num_questoes} questões de múltipla escolha sobre {materia_simulado.strip()} para {perfil.get('curso')}, nível {dificuldade_sim}. Formato: **Questão N:** enunciado, a) b) c) d), **Resposta:** letra — explicação."
+                        resp = cliente.messages.create(model="claude-sonnet-4-5", max_tokens=2000, messages=[{"role": "user", "content": prompt_sim}])
+                        st.markdown(resp.content[0].text)
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
-        col_v1, col_v2 = st.columns(2)
-        with col_v1:
-            materia_video = st.selectbox("Matéria", perfil.get("materias","").split(","), key="mat_video")
-            tipo_conteudo = st.selectbox("O que você precisa?", [
-                "Explicação do zero",
-                "Resumo rápido",
-                "Exercícios resolvidos passo a passo",
-                "Mapa mental do conteúdo",
-                "Dicas para a prova"
-            ])
-        with col_v2:
-            topico = st.text_input("Tópico específico", placeholder="ex: integrais por partes, ponteiros em C...")
-            formato = st.selectbox("Formato preferido", ["Texto explicativo", "Lista de tópicos", "Exemplo prático", "Analogia simples"])
+        with tab4:
+            st.markdown("### 🎥 Videoaulas e Lições Complementares")
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                materia_video = st.selectbox("Matéria", perfil.get("materias","").split(","), key="mat_video")
+                tipo_conteudo = st.selectbox("O que você precisa?", ["Explicação do zero", "Resumo rápido", "Exercícios resolvidos", "Mapa mental", "Dicas para a prova"])
+            with col_v2:
+                topico = st.text_input("Tópico específico", placeholder="ex: integrais por partes...")
+                formato = st.selectbox("Formato", ["Texto explicativo", "Lista de tópicos", "Exemplo prático", "Analogia simples"])
 
-        if st.button("🎓 Gerar lição complementar"):
-            with st.spinner("Preparando sua lição personalizada..."):
-                try:
-                    cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            if st.button("🎓 Gerar lição"):
+                with st.spinner("Preparando sua lição..."):
+                    try:
+                        cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                        prompt_video = f"Professor expert em {materia_video.strip()}. Crie lição para {nome} de {perfil.get('curso')}. Tópico: {topico or 'geral'}. Tipo: {tipo_conteudo}. Formato: {formato}. Inclua: objetivo, explicação, exemplos práticos, 3 exercícios com gabarito, 3 canais YouTube, 2 sites, 1 livro, dica de memorização."
+                        resp = cliente.messages.create(model="claude-sonnet-4-5", max_tokens=2500, messages=[{"role": "user", "content": prompt_video}])
+                        licao = resp.content[0].text
+                        st.markdown(licao)
+                        st.download_button("📥 Baixar lição", data=licao, file_name=f"licao_{materia_video.strip()}.txt", mime="text/plain")
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
-                    prompt_video = f"""Você é um professor universitário expert em {materia_video.strip()}.
-
-Crie uma lição complementar para {nome}, estudante de {perfil.get('curso')} na {perfil.get('universidade') or 'faculdade'}.
-
-CONFIGURAÇÕES:
-- Matéria: {materia_video.strip()}
-- Tópico: {topico if topico else 'geral da matéria'}
-- Tipo: {tipo_conteudo}
-- Formato: {formato}
-- Nível do aluno: {perfil.get('nivel')}
-- Estilo de aprendizado: {perfil.get('estilo')}
-
-ESTRUTURA DA LIÇÃO:
-1. 🎯 Objetivo — o que {nome} vai aprender
-2. 📖 Explicação principal no formato {formato}
-3. 💡 Exemplos práticos contextualizados para {perfil.get('curso')}
-4. ✏️ 3 exercícios para praticar (com gabarito)
-5. 🔗 Sugestões de recursos:
-   - 3 canais do YouTube específicos (ex: Canal X — vídeo sobre Y)
-   - 2 sites ou materiais gratuitos
-   - 1 livro recomendado
-6. 🧠 Dica de memorização para esse conteúdo
-
-Seja didático, use emojis e exemplos do cotidiano de um universitário de {perfil.get('curso')}."""
-
-                    resposta_video = cliente.messages.create(
-                        model="claude-sonnet-4-5",
-                        max_tokens=2500,
-                        messages=[{"role": "user", "content": prompt_video}]
-                    )
-
-                    licao = resposta_video.content[0].text
-                    st.markdown(licao)
-                    st.download_button(
-                        label="📥 Baixar lição em .txt",
-                        data=licao,
-                        file_name=f"licao_{materia_video.strip().lower().replace(' ','_')}.txt",
-                        mime="text/plain"
-                    )
-
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-st.markdown("""
-<footer>Point.AI © 2025 — Feito para universitários que levam os estudos a sério.</footer>
-""", unsafe_allow_html=True)
+st.markdown("<footer>Point.AI © 2025 — Feito para universitários que levam os estudos a sério.</footer>", unsafe_allow_html=True)
