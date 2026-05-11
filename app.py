@@ -39,10 +39,10 @@ if "perfil" not in st.session_state:
     st.session_state.perfil = {}
 
 params = st.query_params
-if "code" in params and st.session_state.user is None:
+if "access_token" in params and st.session_state.user is None:
     try:
-        session = supabase.auth.exchange_code_for_session({"auth_code": params["code"]})
-        st.session_state.user = session.user
+        user = supabase.auth.get_user(params["access_token"])
+        st.session_state.user = user.user
         st.query_params.clear()
         st.rerun()
     except Exception as e:
@@ -65,9 +65,12 @@ if st.session_state.user is None:
                 redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
                 data = supabase.auth.sign_in_with_oauth({
                     "provider": "google",
-                    "options": {"redirect_to": redirect_url}
+                    "options": {
+                        "redirect_to": redirect_url,
+                        "skip_http_redirect": True
+                    }
                 })
-                st.link_button("✅ Clique aqui para fazer login", url=data.url)
+                st.link_button("✅ Clique aqui para fazer login com Google", url=data.url)
             except Exception as e:
                 st.error(f"Erro: {e}")
 
@@ -88,7 +91,7 @@ else:
     st.markdown("""
     <div class="hero">
         <span class="badge">🤖 Powered by IA</span>
-        <h1>🎯 Point.AI</h1>
+        <h1>�� Point.AI</h1>
         <p>Planos de estudo personalizados para universitários.</p>
     </div>
     """, unsafe_allow_html=True)
