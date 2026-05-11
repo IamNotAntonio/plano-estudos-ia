@@ -179,7 +179,7 @@ else:
     with col_d:
         st.metric("📸 Fotos", len(perfil.get("imagens", [])))
 
-    tab1, tab2, tab3 = st.tabs(["📚 Meu Plano", "💬 Chat com IA", "📝 Simulado"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📚 Meu Plano", "💬 Chat com IA", "📝 Simulado", "🎥 Videoaulas"])
 
     with tab1:
         st.markdown(st.session_state.plano_gerado)
@@ -276,7 +276,71 @@ Seja específico e educativo."""
 
                 except Exception as e:
                     st.error(f"Erro: {e}")
+with tab4:
+        st.markdown("### 🎥 Videoaulas e Lições Complementares")
+        st.caption("A IA seleciona e explica conteúdos específicos para suas matérias.")
 
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            materia_video = st.selectbox("Matéria", perfil.get("materias","").split(","), key="mat_video")
+            tipo_conteudo = st.selectbox("O que você precisa?", [
+                "Explicação do zero",
+                "Resumo rápido",
+                "Exercícios resolvidos passo a passo",
+                "Mapa mental do conteúdo",
+                "Dicas para a prova"
+            ])
+        with col_v2:
+            topico = st.text_input("Tópico específico", placeholder="ex: integrais por partes, ponteiros em C...")
+            formato = st.selectbox("Formato preferido", ["Texto explicativo", "Lista de tópicos", "Exemplo prático", "Analogia simples"])
+
+        if st.button("🎓 Gerar lição complementar"):
+            with st.spinner("Preparando sua lição personalizada..."):
+                try:
+                    cliente = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+                    prompt_video = f"""Você é um professor universitário expert em {materia_video.strip()}.
+
+Crie uma lição complementar para {nome}, estudante de {perfil.get('curso')} na {perfil.get('universidade') or 'faculdade'}.
+
+CONFIGURAÇÕES:
+- Matéria: {materia_video.strip()}
+- Tópico: {topico if topico else 'geral da matéria'}
+- Tipo: {tipo_conteudo}
+- Formato: {formato}
+- Nível do aluno: {perfil.get('nivel')}
+- Estilo de aprendizado: {perfil.get('estilo')}
+
+ESTRUTURA DA LIÇÃO:
+1. 🎯 Objetivo — o que {nome} vai aprender
+2. 📖 Explicação principal no formato {formato}
+3. 💡 Exemplos práticos contextualizados para {perfil.get('curso')}
+4. ✏️ 3 exercícios para praticar (com gabarito)
+5. 🔗 Sugestões de recursos:
+   - 3 canais do YouTube específicos (ex: Canal X — vídeo sobre Y)
+   - 2 sites ou materiais gratuitos
+   - 1 livro recomendado
+6. 🧠 Dica de memorização para esse conteúdo
+
+Seja didático, use emojis e exemplos do cotidiano de um universitário de {perfil.get('curso')}."""
+
+                    resposta_video = cliente.messages.create(
+                        model="claude-sonnet-4-5",
+                        max_tokens=2500,
+                        messages=[{"role": "user", "content": prompt_video}]
+                    )
+
+                    licao = resposta_video.content[0].text
+                    st.markdown(licao)
+                    st.download_button(
+                        label="📥 Baixar lição em .txt",
+                        data=licao,
+                        file_name=f"licao_{materia_video.strip().lower().replace(' ','_')}.txt",
+                        mime="text/plain"
+                    )
+
+                except Exception as e:
+                    st.error(f"Erro: {e}")
 st.markdown("""
 <footer>StudyAI © 2025 — Feito para universitários que levam os estudos a sério.</footer>
 """, unsafe_allow_html=True)
