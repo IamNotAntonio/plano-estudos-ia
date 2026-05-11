@@ -4,8 +4,11 @@ import unicodedata
 import streamlit as st
 import anthropic
 from dotenv import load_dotenv
-from fpdf import FPDF
-
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.units import cm
+from io import BytesIO
 load_dotenv()
 
 st.set_page_config(page_title="Point.AI", page_icon="🎯", layout="centered")
@@ -48,38 +51,32 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def gerar_pdf(texto, nome):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_margins(15, 15, 15)
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Point.AI - Plano de Estudos", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 8, f"Aluno: {nome}", ln=True, align="C")
-    pdf.ln(6)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    story = []
+    style_titulo = ParagraphStyle("titulo", parent=styles["Title"], fontSize=18, spaceAfter=6)
+    style_h1 = ParagraphStyle("h1", parent=styles["Heading1"], fontSize=13, spaceAfter=4)
+    style_h2 = ParagraphStyle("h2", parent=styles["Heading2"], fontSize=11, spaceAfter=4)
+    style_normal = ParagraphStyle("normal", parent=styles["Normal"], fontSize=9, spaceAfter=2, leading=14)
+    story.append(Paragraph("Point.AI - Plano de Estudos", style_titulo))
+    story.append(Paragraph(f"Aluno: {nome}", style_normal))
+    story.append(Spacer(1, 0.4*cm))
     for linha in texto.split("\n"):
-        linha_limpa = unicodedata.normalize("NFKD", linha).encode("ascii", "ignore").decode("ascii")
-        linha_limpa = linha_limpa[:200]
-        if not linha_limpa.strip():
-            pdf.ln(3)
-            continue
-        if linha_limpa.startswith("###"):
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.multi_cell(0, 6, linha_limpa.replace("###", "").strip()[:150])
-            pdf.set_font("Helvetica", "", 9)
+        linha_limpa = unicodedata.normalize("NFKD", linha).encode("ascii", "ignore").decode("ascii").strip()
+        if not linha_limpa:
+            story.append(Spacer(1, 0.2*cm))
+        elif linha_limpa.startswith("###"):
+            story.append(Paragraph(linha_limpa.replace("###","").strip(), style_h2))
         elif linha_limpa.startswith("##"):
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.multi_cell(0, 6, linha_limpa.replace("##", "").strip()[:150])
-            pdf.set_font("Helvetica", "", 9)
+            story.append(Paragraph(linha_limpa.replace("##","").strip(), style_h1))
         elif linha_limpa.startswith("#"):
-            pdf.set_font("Helvetica", "B", 13)
-            pdf.multi_cell(0, 6, linha_limpa.replace("#", "").strip()[:150])
-            pdf.set_font("Helvetica", "", 9)
+            story.append(Paragraph(linha_limpa.replace("#","").strip(), style_titulo))
         else:
-            pdf.set_font("Helvetica", "", 9)
-            pdf.multi_cell(0, 5, linha_limpa.strip())
-    return pdf.output()
-
+            linha_limpa = linha_limpa.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            story.append(Paragraph(linha_limpa, style_normal))
+    doc.build(story)
+    return buffer.getvalue()
 if "plano_gerado" not in st.session_state:
     st.session_state.plano_gerado = None
 if "chat_history" not in st.session_state:
