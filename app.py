@@ -50,30 +50,34 @@ st.markdown("""
 def gerar_pdf(texto, nome):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_margins(20, 20, 20)
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 12, "Point.AI - Plano de Estudos", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, f"Aluno: {nome}", ln=True, align="C")
-    pdf.ln(8)
+    pdf.set_margins(15, 15, 15)
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Point.AI - Plano de Estudos", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, f"Aluno: {nome}", ln=True, align="C")
+    pdf.ln(6)
     for linha in texto.split("\n"):
         linha_limpa = unicodedata.normalize("NFKD", linha).encode("ascii", "ignore").decode("ascii")
+        linha_limpa = linha_limpa[:200]
+        if not linha_limpa.strip():
+            pdf.ln(3)
+            continue
         if linha_limpa.startswith("###"):
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.multi_cell(0, 7, linha_limpa.replace("###", "").strip())
-            pdf.set_font("Helvetica", "", 10)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.multi_cell(0, 6, linha_limpa.replace("###", "").strip()[:150])
+            pdf.set_font("Helvetica", "", 9)
         elif linha_limpa.startswith("##"):
-            pdf.set_font("Helvetica", "B", 13)
-            pdf.multi_cell(0, 7, linha_limpa.replace("##", "").strip())
-            pdf.set_font("Helvetica", "", 10)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.multi_cell(0, 6, linha_limpa.replace("##", "").strip()[:150])
+            pdf.set_font("Helvetica", "", 9)
         elif linha_limpa.startswith("#"):
-            pdf.set_font("Helvetica", "B", 14)
-            pdf.multi_cell(0, 7, linha_limpa.replace("#", "").strip())
-            pdf.set_font("Helvetica", "", 10)
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.multi_cell(0, 6, linha_limpa.replace("#", "").strip()[:150])
+            pdf.set_font("Helvetica", "", 9)
         else:
-            pdf.multi_cell(0, 6, linha_limpa)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.multi_cell(0, 5, linha_limpa.strip())
     return pdf.output()
 
 if "plano_gerado" not in st.session_state:
