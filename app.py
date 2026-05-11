@@ -288,8 +288,44 @@ Crie plano detalhado com: análise do perfil, cronograma semanal com checklists,
 
         with tab1:
             st.markdown(st.session_state.plano_gerado)
-            st.download_button("📥 Baixar plano", data=st.session_state.plano_gerado, file_name=f"plano_{nome}.txt", mime="text/plain")
-            if st.button("🔄 Novo plano"):
+            from fpdf import FPDF
+import unicodedata
+
+def gerar_pdf(texto, nome):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(20, 20, 20)
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.cell(0, 12, "Point.AI - Plano de Estudos", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Aluno: {nome}", ln=True, align="C")
+    pdf.ln(8)
+    pdf.set_font("Helvetica", "", 10)
+    for linha in texto.split("\n"):
+        linha_limpa = unicodedata.normalize("NFKD", linha).encode("ascii", "ignore").decode("ascii")
+        if linha_limpa.startswith("###"):
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.multi_cell(0, 7, linha_limpa.replace("###", "").strip())
+            pdf.set_font("Helvetica", "", 10)
+        elif linha_limpa.startswith("##"):
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.multi_cell(0, 7, linha_limpa.replace("##", "").strip())
+            pdf.set_font("Helvetica", "", 10)
+        elif linha_limpa.startswith("#"):
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.multi_cell(0, 7, linha_limpa.replace("#", "").strip())
+            pdf.set_font("Helvetica", "", 10)
+        else:
+            pdf.multi_cell(0, 6, linha_limpa)
+    return pdf.output()
+
+pdf_bytes = gerar_pdf(st.session_state.plano_gerado, nome)
+col_down1, col_down2 = st.columns(2)
+with col_down1:
+    st.download_button("📥 Baixar plano em .txt", data=st.session_state.plano_gerado, file_name=f"plano_{nome}.txt", mime="text/plain")
+with col_down2:
+    st.download_button("📄 Baixar plano em PDF", data=bytes(pdf_bytes), file_name=f"plano_{nome}.pdf", mime="application/pdf")
                 st.session_state.plano_gerado = None
                 st.rerun()
 

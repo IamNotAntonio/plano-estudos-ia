@@ -3,3 +3,4 @@ python-dotenv
 streamlit
 supabase
 streamlit-oauth
+fpdf2
