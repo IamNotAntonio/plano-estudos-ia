@@ -11,11 +11,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(
-    page_title="Point.AI — Seu Plano de Estudos",
-    page_icon="🎯",
-    layout="centered"
-)
+st.set_page_config(page_title="Point.AI", page_icon="🎯", layout="centered")
 
 st.markdown("""
 <style>
@@ -26,10 +22,8 @@ st.markdown("""
     .hero p { font-size: 1.1rem; color: #666; margin-bottom: 2rem; }
     .badge { display: inline-block; background: #e8f4fd; color: #2980b9; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 1rem; }
     .stButton > button { background: #2980b9; color: white; border: none; border-radius: 10px; padding: 0.7rem 2rem; font-size: 1rem; font-weight: 600; width: 100%; }
-    .stButton > button:hover { background: #1a6fa8; }
     .chat-msg-user { background: #2980b9; color: white; border-radius: 16px 16px 4px 16px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; margin-left: auto; }
     .chat-msg-ai { background: #f0f4f8; color: #1a1a2e; border-radius: 16px 16px 16px 4px; padding: 0.8rem 1.2rem; margin: 0.5rem 0; max-width: 80%; }
-    .login-box { background: white; border-radius: 16px; padding: 3rem 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center; max-width: 400px; margin: 2rem auto; }
     div[data-testid="stForm"] { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
     footer { text-align: center; color: #aaa; font-size: 0.8rem; margin-top: 3rem; padding-bottom: 2rem; }
 </style>
@@ -63,22 +57,19 @@ if st.session_state.user is None:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="login-box">', unsafe_allow_html=True)
-    st.markdown("### Entre para começar")
-    st.markdown("Acesse com sua conta Google e receba seu plano personalizado.")
-
-    if st.button("🔑 Entrar com Google"):
-        try:
-            redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
-            data = supabase.auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {"redirect_to": redirect_url}
-            })
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={data.url}">', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Erro: {e}")
-
-    st.markdown('</div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("### Entre para começar")
+        if st.button("🔑 Entrar com Google"):
+            try:
+                redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
+                data = supabase.auth.sign_in_with_oauth({
+                    "provider": "google",
+                    "options": {"redirect_to": redirect_url}
+                })
+                st.link_button("✅ Clique aqui para fazer login", url=data.url)
+            except Exception as e:
+                st.error(f"Erro: {e}")
 
 else:
     user = st.session_state.user
@@ -86,7 +77,6 @@ else:
     email_user = user.email
 
     with st.sidebar:
-        st.image(user.user_metadata.get("avatar_url", ""), width=60)
         st.markdown(f"**{nome_user}**")
         st.caption(email_user)
         if st.button("🚪 Sair"):
@@ -162,7 +152,6 @@ PERFIL: {nome} | {curso} | {universidade} | {semestre} | Objetivo: {objetivo}
 Matérias: {materias} | {horas}h/dia | {semanas} semanas | {estilo} | {nivel}
 Dificuldade: {dificuldade} | Provas: {provas}
 Imagens: {', '.join(imagens_analisadas) if imagens_analisadas else 'nenhuma'}
-
 Crie plano detalhado com: análise do perfil, cronograma semanal com checklists, técnicas personalizadas, marcos de progresso, recursos recomendados e mensagem motivacional. Use emojis."""
 
                         content.append({"type": "text", "text": prompt})
