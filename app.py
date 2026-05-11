@@ -69,7 +69,7 @@ if st.session_state.user is None:
 
     if st.button("🔑 Entrar com Google"):
         try:
-            redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app"
+            redirect_url = "https://plano-estudos-iagit-kexcfvfuuztcf6tztfipif.streamlit.app/"
             data = supabase.auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {"redirect_to": redirect_url}
